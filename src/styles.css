@@ -658,19 +658,41 @@ a {
   color: #555d66;
 }
 
+.qrPanel small {
+  display: block;
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .qrMask button {
   justify-self: center;
-  width: 72px;
-  height: 64px;
-  margin-top: 14px;
-  border: 1px dashed #f15e6e;
-  background: rgba(255, 255, 255, 0.8);
-  color: #333;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  margin-top: 12px;
+  padding: 0 12px;
+  border: 1px solid #d6dbe2;
+  border-radius: 8px;
+  background: #fff;
+  color: #454b52;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.qrMask button svg {
+  width: 14px;
+  height: 14px;
 }
 
 .qrPanel p {
   margin: 0 0 4px;
-  line-height: 1.45;
+  color: #30353b;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .loginSuccess {
@@ -709,27 +731,26 @@ a {
   box-shadow: 0 24px 54px rgba(28, 36, 45, 0.18);
 }
 
+.scannerLogin {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #f3f1f1;
+}
+
 .gameBg {
   position: absolute;
   inset: 0;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 52% 44%, rgba(255, 255, 255, 0.84), transparent 0 13%, transparent 22%),
-    linear-gradient(180deg, #72b8e6 0%, #bde5ff 33%, #71ba94 72%, #2f6e4f 100%);
+  background: #7dc6ef url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzNjAgNjQwIj4KPGRlZnM+CjxsaW5lYXJHcmFkaWVudCBpZD0ic2t5IiB4MT0iMCIgeTE9IjAiIHgyPSIwIiB5Mj0iMSI+CjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiM3ZGM2ZWYiLz4KPHN0b3Agb2Zmc2V0PSI0NCUiIHN0b3AtY29sb3I9IiNjOGVjZmYiLz4KPHN0b3Agb2Zmc2V0PSI2MCUiIHN0b3AtY29sb3I9IiNkZmYxZGUiLz4KPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjNWZiZTk1Ii8+CjwvbGluZWFyR3JhZGllbnQ+CjxsaW5lYXJHcmFkaWVudCBpZD0icml2ZXIiIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj4KPHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzkzZDdmMCIvPgo8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiM0Yjk1YzYiLz4KPC9saW5lYXJHcmFkaWVudD4KPGxpbmVhckdyYWRpZW50IGlkPSJoaWxsIiB4MT0iMCIgeTE9IjAiIHgyPSIwIiB5Mj0iMSI+CjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNiNWQ4ODgiLz4KPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjNmFhMzZkIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPHJlY3Qgd2lkdGg9IjM2MCIgaGVpZ2h0PSI2NDAiIGZpbGw9InVybCgjc2t5KSIvPgo8Y2lyY2xlIGN4PSIxMTAiIGN5PSIxNTAiIHI9IjYyIiBmaWxsPSIjZmZmNGQ3IiBvcGFjaXR5PSIuNyIvPgo8ZWxsaXBzZSBjeD0iMjU4IiBjeT0iMTI0IiByeD0iMzYiIHJ5PSIxNiIgZmlsbD0iI2ZmZiIgb3BhY2l0eT0iLjciLz4KPGVsbGlwc2UgY3g9IjI5OCIgY3k9IjE3OCIgcng9IjQ4IiByeT0iMjAiIGZpbGw9IiNmZmYiIG9wYWNpdHk9Ii41NSIvPgo8cGF0aCBkPSJNMCAyOTZDMzQgMjY2IDYwIDI0OCAxMDIgMjI4QzEzMiAyMTQgMTYzIDE5OCAyMDUgMjA1QzI0NCAyMTEgMjcwIDIzNiAzMDQgMjYyQzMyNCAyNzcgMzQxIDI5MSAzNjAgMzAwVjY0MEgwWiIgZmlsbD0idXJsKCNoaWxsKSIvPgo8cGF0aCBkPSJNMCAzNzBDMzQgMzQ2IDY3IDMyOCAxMDMgMzIwQzE1MCAzMTAgMTg4IDMyMiAyMTQgMzM0QzI0NiAzNDkgMjgwIDM3NCAzNjAgNDIwVjY0MEgwWiIgZmlsbD0iIzc4YjA4ZCIgb3BhY2l0eT0iLjkyIi8+CjxwYXRoIGQ9Ik03MiA0MDRDMTE0IDM3NiAxNDYgMzU0IDE4MiAzNDBDMjI2IDMyMyAyNjYgMzMzIDI5MiAzNTBDMzA3IDM2MCAzMTkgMzc2IDMzMyAzOTRDMzAzIDQwNCAyODAgNDE1IDI1MSA0NDBDMjE1IDQ3MyAxOTQgNTE4IDE3NiA2NDBIMFY0NThDMTkgNDM2IDQzIDQxOSA3MiA0MDRaIiBmaWxsPSJ1cmwoI3JpdmVyKSIgb3BhY2l0eT0iLjkiLz4KPHBhdGggZD0iTTIwOCAzNTZDMjM2IDMxMCAyNjIgMjgyIDMwOCAyMzBDMzI3IDIwOCAzMzkgMTk0IDM2MCAxNzVWMjkyQzMzOSAzMTMgMzEzIDM0MyAyODYgMzg4QzI1NyA0MzcgMjIyIDUwMCAyMDAgNjQwSDE2NEMxNzIgNTQ2IDE4MSA0NTIgMjA4IDM1NloiIGZpbGw9IiM2ZmMwZGYiIG9wYWNpdHk9Ii44Ii8+CjxwYXRoIGQ9Ik0yNDUgOTRDMjY4IDc2IDI4NiA1NCAyOTYgMzBDMzEzIDQ4IDMyMyA2OCAzMjUgOTRDMzE0IDEwMSAyODUgMTA0IDI0NSA5NFoiIGZpbGw9IiM4YWJhNDQiLz4KPHBhdGggZD0iTTMxNCAzNTJDMzA0IDMyNyAyOTYgMzExIDI4MyAyOTJDMjcyIDI3NiAyNjEgMjYyIDI0OCAyNDVDMjQ4IDI0NSAyMzYgMjY2IDIzMiAyNzRDMjE5IDMwMSAyMTQgMzIzIDIwOSAzNDlDMjA1IDM3NyAyMDUgNDA0IDIwOCA0MjhDMjM4IDQxOCAyNjIgNDEyIDI5MyA0MTBDMzA4IDQwOSAzMjEgNDA5IDMzNiA0MTFDMzM0IDM4NSAzMjcgMzY5IDMxNCAzNTJaIiBmaWxsPSIjMmI1YjYzIiBvcGFjaXR5PSIuODUiLz4KPHBhdGggZD0iTTI2MCA0NTBDMjQwIDQ2NiAyMjIgNDk0IDIwOSA1MjBDMTk3IDU0MyAxOTEgNTY3IDE4NSA2NDBIMzYwVjYxOEMzNDEgNTY4IDMxOSA1MjcgMjkyIDQ4N0MyODIgNDczIDI3MiA0NjEgMjYwIDQ1MFoiIGZpbGw9IiM0NTdiNTkiIG9wYWNpdHk9Ii45Ii8+CjxnIG9wYWNpdHk9Ii41IiBmaWxsPSIjZjZmZmY4Ij4KPHBhdGggZD0iTTQ4IDE1NmM5IDAgMTIgNCAxOCAxMi03LTItMTEtMi0xOCAwLTUtNy05LTEyLTE4LTEyIDYtMiAxMS0yIDE4IDB6Ii8+CjxwYXRoIGQ9Ik04MiAxMzJjNyAwIDEwIDMgMTQgOS01LTItOC0yLTE0IDAtNC01LTctOS0xNC05IDQtMSA4LTEgMTQgMHoiLz4KPHBhdGggZD0iTTI5NCAxNDZjOCAwIDExIDQgMTYgMTAtNi0yLTEwLTItMTYgMC00LTYtOC0xMC0xNi0xMCA1LTEgOS0xIDE2IDB6Ii8+CjwvZz4KPHBhdGggZD0iTTI4IDU3NGMzOC0yNCA3MC00OCA5Ni03MiAxMSAyNiAyNiA0OSA0MyA3MkgyOFoiIGZpbGw9IiMyNzRmNGMiIG9wYWNpdHk9Ii43MiIvPgo8cGF0aCBkPSJNMjU4IDU2MGMxMiAxOCAyNCA0MSAzNSA4MEgyMDhjMTItMjggMjctNTYgNTAtODB6IiBmaWxsPSIjNGU2ZjQ4IiBvcGFjaXR5PSIuOCIvPgo8cGF0aCBkPSJNMTQzIDU4MmMxMCAxNSAyMCAzNCAyOCA1OGgtNTZjOS0xOSAxNy0zOCAyOC01OHoiIGZpbGw9IiMzMTRmNGMiIG9wYWNpdHk9Ii44NiIvPgo8Y2lyY2xlIGN4PSI3MSIgY3k9IjU5NCIgcj0iOCIgZmlsbD0iI2YwZDBhNiIvPgo8Y2lyY2xlIGN4PSI4NCIgY3k9IjYwMCIgcj0iOSIgZmlsbD0iI2YwZDBhNiIvPgo8cGF0aCBkPSJNNjcgNjAwbC04IDM0aDE1eiIgZmlsbD0iIzJkMWIxNyIvPgo8cGF0aCBkPSJNODYgNjA0bDMgMzBoMTRsLTYtMzh6IiBmaWxsPSIjNGQyZDE5Ii8+CjxwYXRoIGQ9Ik0zMDIgNTQxbDEwIDgtMTAgNS0xMC01eiIgZmlsbD0iI2ZmZiIgb3BhY2l0eT0iLjU1Ii8+CjxwYXRoIGQ9Ik0zMTggNTIzbDggNi04IDUtOC01eiIgZmlsbD0iI2ZmZiIgb3BhY2l0eT0iLjQ1Ii8+Cjwvc3ZnPg==") center/cover no-repeat;
 }
 
 .gameBg::before {
   content: "";
   position: absolute;
-  left: -50px;
-  right: -60px;
-  top: 150px;
-  height: 230px;
-  background:
-    linear-gradient(140deg, transparent 0 24%, #324b70 25% 38%, transparent 39%),
-    linear-gradient(35deg, transparent 0 28%, #8c2d38 29% 42%, transparent 43%),
-    linear-gradient(155deg, transparent 0 37%, #e7e9ef 38% 50%, transparent 51%);
-  opacity: 0.95;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.08));
 }
 
 .gameBg h1 {
@@ -744,15 +765,19 @@ a {
   letter-spacing: 0;
 }
 
+.gameHome .gameLogo {
+  left: 50%;
+  top: 40px;
+  width: auto;
+  transform: translateX(-50%);
+  color: #a8001e;
+  font-size: 72px;
+  letter-spacing: 4px;
+  text-shadow: 0 4px #fff, 0 14px 26px rgba(78, 20, 20, 0.3);
+}
+
 .mountain {
-  position: absolute;
-  left: -20px;
-  right: -20px;
-  top: 0;
-  height: 225px;
-  background:
-    linear-gradient(145deg, transparent 0 45%, rgba(36, 94, 119, 0.5) 46% 56%, transparent 57%),
-    linear-gradient(35deg, transparent 0 37%, rgba(72, 139, 150, 0.45) 38% 50%, transparent 51%);
+  display: none;
 }
 
 .sideActions {
@@ -771,6 +796,86 @@ a {
   background: rgba(33, 93, 145, 0.72);
   color: #fff;
   font-size: 12px;
+}
+
+.gameHome .sideActions {
+  top: 14px;
+  gap: 11px;
+}
+
+.gameHome .sideActions button {
+  width: 42px;
+  height: 42px;
+  background: rgba(71, 100, 146, 0.82);
+  font-size: 11px;
+}
+
+.serverPanel {
+  position: absolute;
+  left: 50%;
+  bottom: 110px;
+  width: 302px;
+  transform: translateX(-50%);
+  padding: 10px 14px 12px;
+  border-radius: 14px;
+  background: rgba(34, 34, 34, 0.28);
+  color: #fff;
+  text-align: center;
+  backdrop-filter: blur(1px);
+}
+
+.serverHot {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.serverHot b {
+  color: #f5fff4;
+}
+
+.serverLine {
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  align-items: center;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.serverLine a {
+  color: #ffd28e;
+  text-decoration: underline;
+}
+
+.gameEnter {
+  position: absolute;
+  left: 50%;
+  bottom: 36px;
+  width: 228px;
+  height: 60px;
+  transform: translateX(-50%);
+  border: 0;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffd14c, #f89c1e 70%, #d86d00);
+  color: #fff;
+  font-size: 28px;
+  font-weight: 800;
+  text-shadow: 0 2px 2px rgba(106, 53, 0, 0.45);
+  box-shadow: 0 12px 20px rgba(95, 59, 0, 0.28);
+}
+
+.gameNotice {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 10px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 
 .enterGame {
@@ -928,6 +1033,15 @@ a {
   transform: none;
   box-shadow: none;
   background: #fff8f2;
+}
+
+.centerRow.blocked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.centerRow.blocked:hover {
+  background: #fff;
 }
 
 .centerRow span,
