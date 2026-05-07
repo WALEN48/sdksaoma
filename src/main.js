@@ -1,8 +1,11 @@
 const SCENE = 'TZ_SDK_QR_LOGIN';
-const LOGIN_METHOD = 'qr_login';
+const LOGIN_METHOD = '扫码登录';
 const EXPIRY_SECONDS = 120;
-const VERSION = 'v0.1.2';
-const SUCCESS_PROMPT = '扫码登录校验成功,您的账号已在扫码设备上登录，当前账号已下线';
+const VERSION = 'v0.1.3';
+const SUCCESS_PROMPT = '扫码登录校验成功，您的账号已在扫码设备上登录，当前账号已下线';
+const SCAN_EXPIRED_TEXT = '二维码已过期，请重新生成';
+const SCAN_INVALID_TEXT = '二维码已失效，请重新生成';
+const QR_ENTRY_BLOCKED = new Set(['phone', 'wechat', 'lock', 'logout']);
 
 const state = {
   hasHistory: true,
@@ -113,7 +116,7 @@ function expireQr(showToast = true) {
   state.qr.status = 'expired';
   state.qr.expiresAt = Date.now();
   addLog('qr_expired', '二维码已过期');
-  if (showToast) setToast('二维码已过期，请重新生成');
+  if (showToast) setToast(SCAN_EXPIRED_TEXT);
   render();
 }
 
@@ -139,14 +142,14 @@ function simulateScan(mode = 'camera') {
     state.scannerModal = 'scanFailed';
     state.scanError = 'expired';
     addLog('scan_failed', 'credential_expired');
-    setToast('二维码已过期，请重新生成');
+    setToast(SCAN_EXPIRED_TEXT);
     return;
   }
   if (!state.sameGameId) {
     state.scannerModal = 'scanFailed';
     state.scanError = 'invalid';
     addLog('scan_failed', 'gameid_mismatch');
-    setToast('无效二维码');
+    setToast(SCAN_INVALID_TEXT);
     render();
     return;
   }
@@ -164,7 +167,7 @@ function confirmAuth() {
   state.scannerModal = 'success';
   state.targetModal = 'success';
   state.scanError = null;
-  addLog(LOGIN_METHOD, '扫码登录授权成功');
+  addLog(LOGIN_METHOD, '授权成功');
   render();
 }
 
@@ -193,8 +196,8 @@ function openScanner() {
   render();
 }
 
-function handleBlockedAction(label) {
-  if (state.qrLoginAccount) {
+function handleBlockedAction(label, blocked = false) {
+  if (blocked || state.qrLoginAccount) {
     setToast('扫码登录不支持本操作');
   } else {
     setToast(`${label}功能入口已点击`);
@@ -276,6 +279,16 @@ function renderPhoneLogin() {
   `, '', 'sdkBranded phoneSdk');
 }
 
+function renderLogs() {
+  const rows = state.logs.map((item) => `<p><b>${item.time}</b><span>${item.type}</span><em>${item.detail}</em></p>`).join('');
+  return `
+    <section class="logs">
+      <h3>登录日志</h3>
+      ${rows || '<p><b>--:--:--</b><span>暂无</span><em>尚未触发扫码相关日志</em></p>'}
+    </section>
+  `;
+}
+
 function renderGameLogin() {
   return `
     <div class="gameBg gameHome">
@@ -296,18 +309,20 @@ function renderQrLogin() {
   const st = state.qr?.status;
   const waiting = st === 'scanned';
   const authorized = st === 'authorized';
-  const expired = !state.qr || ['expired', 'failed', 'canceled'].includes(st);
-  const mask = expired || waiting || authorized;
-  const statusText = waiting ? '已扫码，等待授权' : authorized ? '已授权' : st === 'canceled' ? '授权已取消' : '二维码已过期';
-  const note = expired ? '请刷新后重新扫码' : waiting ? '请在扫码端完成授权' : authorized ? '授权已完成' : `二维码有效剩余 ${getRemainingSeconds()} 秒`;
+  const expired = !state.qr || st === 'expired';
+  const invalid = st === 'failed';
+  const canceled = st === 'canceled';
+  const mask = expired || invalid || canceled || waiting || authorized;
+  const statusText = waiting ? '已扫码，等待授权' : authorized ? '已授权' : canceled ? '授权已取消' : invalid ? '二维码已失效' : '二维码已过期';
+  const note = expired ? '请刷新后重新扫码' : invalid ? '请重新生成二维码后再次扫码' : waiting ? '请在扫码端完成授权' : authorized ? '授权已完成' : '授权已取消';
   return sdkShell(`
     <div class="qrPanel">
       <div class="qrBox">
         ${qrPattern(mask)}
-        ${mask ? `<div class="qrMask"><b>${statusText}</b><span>${note}</span>${expired ? `<button onclick="actions.startQr()">${icon('refresh')}刷新</button>` : ''}</div>` : ''}
+        ${mask ? `<div class="qrMask"><b>${statusText}</b><span>${note}</span>${expired || invalid ? `<button onclick="actions.startQr()">${icon('refresh')}刷新</button>` : ''}</div>` : ''}
       </div>
       <p>使用“用户中心 - 扫一扫”授权登录<br />授权状态仅本次生效</p>
-      ${expired ? '' : `<small>二维码有效剩余 <b id="countdown">${getRemainingSeconds()}</b> 秒</small>`}
+      ${expired || invalid || canceled ? '' : `<small>二维码有效剩余 <b id="countdown">${getRemainingSeconds()}</b> 秒</small>`}
     </div>
   `, '', 'sdkBranded qrOnly');
 }
@@ -345,7 +360,7 @@ function renderTargetModal() {
   return `
     <div class="modalLayer"><div class="dialog result">
       <h3>提示</h3>
-      <p>扫码授权登录成功</p>
+      <p>${SUCCESS_PROMPT}</p>
       <button class="primary wide" onclick="actions.closeTargetModal()">确定</button>
     </div></div>
   `;
@@ -362,12 +377,12 @@ function renderUserCenter() {
     ['用户协议', '', 'doc'],
     ['隐私政策', '', 'privacy']
   ];
-  const hide = new Set(state.qrLoginAccount ? ['phone', 'wechat', 'lock', 'logout', 'scan'] : []);
-  return rows.filter(([, , type]) => !hide.has(type)).map(([label, value, type]) => {
+  return rows.map(([label, value, type]) => {
     if (type === 'scan' && !state.channelEnabled) return '';
-    const click = type === 'scan' ? 'actions.openScanner()' : `actions.blocked('${label}')`;
+    const blocked = state.qrLoginAccount && QR_ENTRY_BLOCKED.has(type);
+    const click = type === 'scan' ? 'actions.openScanner()' : blocked ? `actions.blocked('${label}', true)` : `actions.blocked('${label}')`;
     const arrow = ['shield', 'info', 'doc', 'logout'].includes(type);
-    return `<button class="centerRow ${type === 'scan' ? 'scanRow' : ''}" onclick="${click}">
+    return `<button class="centerRow ${type === 'scan' ? 'scanRow' : ''} ${blocked ? 'blocked' : ''}" onclick="${click}">
       <i class="centerIcon ${type}">${type === 'wechat' ? icon('wechat') : ''}</i>
       <span>${label}</span>
       <em>${value || (arrow ? icon('chevron') : '')}</em>
@@ -464,13 +479,13 @@ function renderScannerModal() {
     return `
       <div class="modalLayer"><div class="dialog result">
         <h3>提示</h3>
-        <p>扫码登录校验成功，您的账号已在扫码设备上登录，当前账号已下线</p>
+        <p>${SUCCESS_PROMPT}</p>
         <button class="primary wide" onclick="actions.finishScanner()">确定</button>
       </div></div>
     `;
   }
   if (state.scannerModal === 'scanFailed') {
-    const msg = state.scanError === 'invalid' ? '无效二维码' : '二维码已过期，请重新生成';
+    const msg = state.scanError === 'invalid' ? SCAN_INVALID_TEXT : SCAN_EXPIRED_TEXT;
     return `
       <div class="modalLayer"><div class="dialog result">
         <h3>提示</h3>
@@ -484,11 +499,11 @@ function renderScannerModal() {
 
 function renderConsole() {
   return `
-    <section class="console open">
+    <section class="console ${state.consoleOpen ? 'open' : ''}">
       <button class="consoleSummary" onclick="actions.toggleConsole()">
         <span>演示调试</span>
-        <small>展开流程开关</small>
-        <i>⌃</i>
+        <small>${state.consoleOpen ? '收起调试面板' : '展开调试面板'}</small>
+        <i>${state.consoleOpen ? '−' : '+'}</i>
       </button>
       ${state.consoleOpen ? `
         <div class="controlGrid">
@@ -505,6 +520,7 @@ function renderConsole() {
           <button onclick="actions.cancelAuth()">授权取消</button>
           <button onclick="actions.resetFlow()">重置流程</button>
         </div>
+        ${renderLogs()}
       ` : ''}
     </section>
   `;
@@ -577,7 +593,7 @@ window.actions = {
         state.scannerModal = 'scanFailed';
         state.scanError = 'invalid';
         addLog('scan_failed', 'gameid_mismatch');
-        setToast('无效二维码');
+        setToast(SCAN_INVALID_TEXT);
         render();
         return;
       }
@@ -590,11 +606,11 @@ window.actions = {
   },
   scanInvalid() {
     ensureQr(() => {
-      state.qr.status = 'expired';
+      state.qr.status = 'failed';
       state.scannerModal = 'scanFailed';
-      state.scanError = 'expired';
+      state.scanError = 'invalid';
       addLog('scan_failed', 'credential_invalid');
-      setToast('二维码已过期，请重新生成');
+      setToast(SCAN_INVALID_TEXT);
       render();
     });
   },
@@ -622,7 +638,7 @@ window.actions = {
   },
   blocked: handleBlockedAction,
   toggleConsole() {
-    state.consoleOpen = true;
+    state.consoleOpen = !state.consoleOpen;
     render();
   },
   toggle(key) {
@@ -674,7 +690,8 @@ window.actions = {
       scannerModal: null,
       targetModal: null,
       scanError: null,
-      toast: ''
+      toast: '',
+      logs: []
     });
     window.clearInterval(timer);
     render();
