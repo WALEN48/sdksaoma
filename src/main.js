@@ -1,6 +1,8 @@
 const SCENE = 'TZ_SDK_QR_LOGIN';
 const LOGIN_METHOD = 'qr_login';
 const EXPIRY_SECONDS = 120;
+const VERSION = 'v0.1.1';
+const SUCCESS_PROMPT = '扫码登录校验成功,您的账号已在扫码设备上登录，当前账号已下线';
 
 const state = {
   hasHistory: true,
@@ -13,11 +15,13 @@ const state = {
   phoneFromHistory: false,
   page: 'history',
   qrOriginPage: null,
-  consoleOpen: false,
   qr: null,
   scannerModal: null,
+  targetModal: null,
+  scanError: null,
   toast: '',
-  logs: []
+  logs: [],
+  consoleOpen: true
 };
 
 const historicalAccounts = [
@@ -109,7 +113,7 @@ function expireQr(showToast = true) {
   state.qr.status = 'expired';
   state.qr.expiresAt = Date.now();
   addLog('qr_expired', '二维码已过期');
-  if (showToast) setToast('二维码已失效，请重新生成');
+  if (showToast) setToast('二维码已过期，请重新生成');
   render();
 }
 
@@ -133,15 +137,16 @@ function simulateScan(mode = 'camera') {
   state.scanMode = mode;
   if (!state.qr || state.qr.status !== 'active') {
     state.scannerModal = 'scanFailed';
+    state.scanError = 'expired';
     addLog('scan_failed', 'credential_expired');
-    setToast('二维码已失效，请重新生成');
+    setToast('二维码已过期，请重新生成');
     return;
   }
   if (!state.sameGameId) {
-    state.qr.status = 'failed';
     state.scannerModal = 'scanFailed';
+    state.scanError = 'invalid';
     addLog('scan_failed', 'gameid_mismatch');
-    setToast('不同 gameid 不可扫码授权登录');
+    setToast('无效二维码');
     render();
     return;
   }
@@ -153,21 +158,28 @@ function simulateScan(mode = 'camera') {
 
 function confirmAuth() {
   if (!state.qr) return;
-  state.qr.status = 'success';
-  state.page = 'success';
+  state.qr.status = 'authorized';
   state.qrLoginAccount = true;
   state.scannerLoggedOut = true;
   state.scannerModal = 'success';
+  state.targetModal = 'success';
+  state.scanError = null;
   addLog(LOGIN_METHOD, '扫码登录授权成功');
-  setToast('登录成功');
+  render();
 }
 
 function cancelAuth() {
   if (state.qr) state.qr.status = 'canceled';
   state.scannerModal = null;
+  state.scanError = null;
   addLog('auth_canceled', '扫码端取消授权');
   setToast('登录失败，授权已取消');
   render();
+}
+
+function ensureQr(fn) {
+  if (!state.qr || state.qr.status !== 'active') startQr();
+  fn();
 }
 
 function openScanner() {
@@ -217,13 +229,12 @@ function qrPattern(disabled = false) {
     const filled = finder || hash === 0 || hash === 3;
     return `<span class="${filled ? 'dark' : ''}"></span>`;
   }).join('');
-  return `<div class="fakeQr ${disabled ? 'muted' : ''}">${cells}<b>应用ICON</b></div>`;
+  return `<div class="fakeQr ${disabled ? 'muted' : ''}">${cells}</div>`;
 }
 
 function sdkShell(content, title = '', extra = '') {
-  const homePage = state.hasHistory ? 'history' : 'phone';
-  const showQrEntry = state.channelEnabled && state.page === homePage;
-  const showBack = state.page === 'qr' || state.page === 'success' || state.phoneFromHistory;
+  const showQrEntry = state.channelEnabled && (state.page === 'history' || (state.page === 'phone' && !state.phoneFromHistory));
+  const showBack = state.page === 'qr' || state.phoneFromHistory;
   return `
     <section class="sdkCard ${extra}">
       ${showQrEntry ? `<button class="cornerQr ${state.page === 'phone' ? 'phoneEntry' : ''}" title="扫码登录" onclick="actions.cornerQr()">${icon('qr')}</button>` : ''}
@@ -264,43 +275,55 @@ function renderPhoneLogin() {
   `, '', 'sdkBranded phoneSdk');
 }
 
+function renderGameLogin() {
+  return `
+    <div class="gameBg gameHome">
+      <div class="sideActions gameActions">
+        <button>客服</button><button>换号</button><button>公告</button><button>协议</button><button>隐私</button>
+      </div>
+      <div class="serverPanel">
+        <div class="serverHot">最新 <b>志在千里64服</b></div>
+        <div class="serverLine"><span>荆州之战46服</span><a>点击换服</a></div>
+      </div>
+      <button class="gameEnter">进入游戏</button>
+      <p class="gameNotice">抵制不良游戏，拒绝盗版游戏。合理安排时间，享受健康生活。</p>
+    </div>
+  `;
+}
+
 function renderQrLogin() {
-  const expired = !state.qr || ['expired', 'failed', 'canceled'].includes(state.qr.status);
-  const statusText = state.qr?.status === 'canceled' ? '授权已取消' : '二维码已过期';
+  const st = state.qr?.status;
+  const waiting = st === 'scanned';
+  const authorized = st === 'authorized';
+  const expired = !state.qr || ['expired', 'failed', 'canceled'].includes(st);
+  const mask = expired || waiting || authorized;
+  const statusText = waiting ? '已扫码，等待授权' : authorized ? '已授权' : st === 'canceled' ? '授权已取消' : '二维码已过期';
+  const note = expired ? '请刷新后重新扫码' : waiting ? '请在扫码端完成授权' : authorized ? '授权已完成' : `二维码有效剩余 ${getRemainingSeconds()} 秒`;
   return sdkShell(`
     <div class="qrPanel">
       <div class="qrBox">
-        ${qrPattern(expired)}
-        ${expired ? `<div class="qrMask"><b>${statusText}</b><span>请刷新后重新扫码</span><button onclick="actions.startQr()">${icon('refresh')}刷新</button></div>` : ''}
+        ${qrPattern(mask)}
+        ${mask ? `<div class="qrMask"><b>${statusText}</b><span>${note}</span>${expired ? `<button onclick="actions.startQr()">${icon('refresh')}刷新</button>` : ''}</div>` : ''}
       </div>
-      <p>打开 <a>应用名称xxxx</a><br />使用“用户中心扫一扫”授权登录</p>
-      <small>授权状态仅本次生效 · 剩余 <b id="countdown">${getRemainingSeconds()}</b> 秒</small>
-    </div>
-  `, '', 'sdkBranded qrOnly');
-}
-
-function renderSuccess() {
-  return sdkShell(`
-    <div class="loginSuccess">
-      <div class="successIcon">✓</div>
-      <h2>登录成功</h2>
-      <p>登录方式：扫码登录</p>
-      <small>本次授权不会写入历史账号，也不会生成自动登录缓存。</small>
+      <p>使用“用户中心 - 扫一扫”授权登录<br />授权状态仅本次生效</p>
+      <small>${expired ? '二维码已过期' : `二维码有效剩余 <b id="countdown">${getRemainingSeconds()}</b> 秒`}</small>
     </div>
   `, '', 'sdkBranded qrOnly');
 }
 
 function renderTargetDevice() {
-  let content = state.page === 'success'
-    ? renderSuccess()
-    : state.page === 'qr'
+  let content = state.scannerLoggedOut
+      ? renderGameLogin()
+      : state.page === 'qr'
       ? renderQrLogin()
       : state.page === 'phone'
         ? renderPhoneLogin()
         : state.hasHistory
-        ? renderHistoryLogin()
-        : renderPhoneLogin();
-  const deviceLabel = state.page === 'phone'
+          ? renderHistoryLogin()
+          : renderPhoneLogin();
+  const deviceLabel = state.scannerLoggedOut
+    ? '游戏登录选服页'
+    : state.page === 'phone'
     ? '手机登录主界面'
     : state.hasHistory
       ? '历史账号页'
@@ -308,11 +331,22 @@ function renderTargetDevice() {
   return `
     <article class="device desktopDevice">
       <div class="deviceTitle">
-        <span>被扫码端 · 无登录态</span>
+        <span>${state.scannerLoggedOut ? '被扫码端 · 已登录' : '被扫码端 · 无登录态'}</span>
         <b>${deviceLabel}</b>
       </div>
-      <div class="screen sdkScreen">${content}</div>
+      <div class="screen sdkScreen">${content}${renderTargetModal()}</div>
     </article>
+  `;
+}
+
+function renderTargetModal() {
+  if (state.targetModal !== 'success') return '';
+  return `
+    <div class="modalLayer"><div class="dialog result">
+      <h3>提示</h3>
+      <p>扫码授权登录成功</p>
+      <button class="primary wide" onclick="actions.closeTargetModal()">确定</button>
+    </div></div>
   `;
 }
 
@@ -327,7 +361,8 @@ function renderUserCenter() {
     ['用户协议', '', 'doc'],
     ['隐私政策', '', 'privacy']
   ];
-  return rows.map(([label, value, type]) => {
+  const hide = new Set(state.qrLoginAccount ? ['phone', 'wechat', 'lock', 'logout', 'scan'] : []);
+  return rows.filter(([, , type]) => !hide.has(type)).map(([label, value, type]) => {
     if (type === 'scan' && !state.channelEnabled) return '';
     const click = type === 'scan' ? 'actions.openScanner()' : `actions.blocked('${label}')`;
     const arrow = ['shield', 'info', 'doc', 'logout'].includes(type);
@@ -343,27 +378,26 @@ function renderScannerDevice() {
   return `
     <article class="device phoneDevice">
       <div class="deviceTitle">
-        <span>扫码端 · 有登录态</span>
-        <b>${state.scannerLoggedOut ? '已下线并回到登录页' : '用户中心'}</b>
+        <span>扫码端·未登录</span>
+        <b>${state.scannerLoggedOut ? '手机登录SDK界面' : '用户中心'}</b>
       </div>
       <div class="phoneScreen">
+        ${state.scannerLoggedOut ? `<div class="scannerLogin">${renderPhoneLogin()}</div>` : `
         <div class="gameBg">
           <div class="mountain"></div>
           <div class="sideActions"><button>客服</button><button>换号</button><button>协议</button><button>隐私</button></div>
-          ${state.scannerLoggedOut ? '<button class="enterGame">进入游戏</button>' : ''}
         </div>
-        <section class="userCenter ${state.scannerLoggedOut ? 'loginOverlay' : ''}">
+        <section class="userCenter">
           <header><span>用户中心</span><button>${icon('close')}</button></header>
-          ${state.scannerLoggedOut ? '<p class="loggedOut">当前账号已下线，请重新拉起 SDK 登录界面。</p>' : `
-            <div class="userProfile">
-              <span class="profileIcon">▯</span>
-              <b>您好，wensonxiao</b>
-              <button>切换账号</button>
-            </div>
-            <div class="userMenu">${renderUserCenter()}</div>
-            <small class="sdkVersion">v1.0.6-60-g0cc932e</small>
-          `}
+          <div class="userProfile">
+            <span class="profileIcon">●</span>
+            <b>您好，wensonxiao</b>
+            <button>切换账号</button>
+          </div>
+          <div class="userMenu">${renderUserCenter()}</div>
+          <small class="sdkVersion">${VERSION}</small>
         </section>
+        `}
         ${renderScannerModal()}
       </div>
     </article>
@@ -420,7 +454,7 @@ function renderScannerModal() {
       <div class="modalLayer"><div class="dialog auth">
         <h3>授权确认</h3>
         <p>是否确认授权此设备登录？</p>
-        <dl><dt>设备</dt><dd>${deviceInfo.name}</dd><dt>地区</dt><dd>${deviceInfo.location}</dd><dt>GameID</dt><dd>${state.sameGameId ? deviceInfo.gameId : 'other_game_9527'}</dd></dl>
+
         <div class="actions"><button class="ghost" onclick="actions.cancelAuth()">取消</button><button class="primary" onclick="actions.confirmAuth()">确认授权</button></div>
       </div></div>
     `;
@@ -435,10 +469,11 @@ function renderScannerModal() {
     `;
   }
   if (state.scannerModal === 'scanFailed') {
+    const msg = state.scanError === 'invalid' ? '无效二维码' : '二维码已过期，请重新生成';
     return `
       <div class="modalLayer"><div class="dialog result">
         <h3>提示</h3>
-        <p>二维码已失效，请重新生成</p>
+        <p>${msg}</p>
         <button class="primary wide" onclick="actions.closeModal()">确定</button>
       </div></div>
     `;
@@ -448,11 +483,11 @@ function renderScannerModal() {
 
 function renderConsole() {
   return `
-    <section class="console ${state.consoleOpen ? 'open' : ''}">
+    <section class="console open">
       <button class="consoleSummary" onclick="actions.toggleConsole()">
         <span>演示调试</span>
         <small>展开流程开关</small>
-        <i>${state.consoleOpen ? '⌃' : '⌄'}</i>
+        <i>⌃</i>
       </button>
       ${state.consoleOpen ? `
         <div class="controlGrid">
@@ -467,12 +502,8 @@ function renderConsole() {
           <button onclick="actions.scanSuccess()">扫码成功</button>
           <button onclick="actions.scanInvalid()">凭证失效</button>
           <button onclick="actions.cancelAuth()">授权取消</button>
-          <button onclick="actions.reset()">重置流程</button>
+          <button onclick="actions.resetFlow()">重置流程</button>
         </div>
-        <section class="logs">
-          <h3>登录日志</h3>
-          ${state.logs.length ? state.logs.map(log => `<p><b>${log.time}</b><span>${log.type}</span><em>${log.detail}</em></p>`).join('') : '<small>暂无日志</small>'}
-        </section>
       ` : ''}
     </section>
   `;
@@ -492,11 +523,10 @@ function render() {
     <section class="prototype">
       <header class="topbar">
         <div>
-          <p>手机确认 · 安全授权 · 即扫即登</p>
-          <h1>扫码安全登录</h1>
+          <h1>SDK扫码登录功能演示</h1>
           <small>使用已登录账号扫码确认，快速在当前设备完成游戏登录。</small>
         </div>
-        <div class="statusPills"><span>120 秒有效</span><span>同游戏授权</span><span>单次登录</span></div>
+        <div class="statusPills"><span>二维码120秒有效</span><span>相同游戏授权</span><span>单次授权登录</span></div>
       </header>
       <section class="workspace">
         ${renderTargetDevice()}
@@ -529,55 +559,60 @@ window.actions = {
     render();
   },
   scanCamera() {
-    if (!state.scannerPermission) {
-      openScanner();
-      return;
-    }
-    simulateScan('camera');
+    ensureQr(() => {
+      if (!state.scannerPermission) {
+        openScanner();
+        return;
+      }
+      simulateScan('camera');
+    });
   },
   scanAlbum() {
-    simulateScan('album');
+    ensureQr(() => simulateScan('album'));
   },
   scanSuccess() {
-    if (!state.qr || state.qr.status !== 'active') {
-      state.scannerModal = 'scanFailed';
-      addLog('scan_failed', 'credential_expired');
-      setToast('二维码已失效，请重新生成');
+    ensureQr(() => {
+      if (!state.sameGameId) {
+        state.scannerModal = 'scanFailed';
+        state.scanError = 'invalid';
+        addLog('scan_failed', 'gameid_mismatch');
+        setToast('无效二维码');
+        render();
+        return;
+      }
+      state.qr.status = 'scanned';
+      state.scannerModal = 'confirm';
+      state.scanError = null;
+      addLog('scan_success', '扫码成功');
       render();
-      return;
-    }
-    if (!state.sameGameId) {
-      state.qr.status = 'failed';
-      state.scannerModal = 'scanFailed';
-      addLog('scan_failed', 'gameid_mismatch');
-      setToast('不同 gameid 不可扫码授权登录');
-      render();
-      return;
-    }
-    state.scannerPermission = true;
-    state.qr.status = 'success';
-    state.page = 'success';
-    state.qrLoginAccount = true;
-    state.scannerLoggedOut = true;
-    state.scannerModal = 'success';
-    addLog(LOGIN_METHOD, '扫码登录授权成功');
-    setToast('登录成功');
+    });
   },
   scanInvalid() {
-    if (state.qr) state.qr.status = 'failed';
-    state.scannerModal = 'scanFailed';
-    addLog('scan_failed', 'credential_invalid');
-    setToast('二维码已失效，请重新生成');
+    ensureQr(() => {
+      state.qr.status = 'expired';
+      state.scannerModal = 'scanFailed';
+      state.scanError = 'expired';
+      addLog('scan_failed', 'credential_invalid');
+      setToast('二维码已过期，请重新生成');
+      render();
+    });
   },
   confirmAuth,
   cancelAuth,
   closeModal() {
     state.scannerModal = null;
+    state.scanError = null;
+    render();
+  },
+  closeTargetModal() {
+    state.targetModal = null;
     render();
   },
   finishScanner() {
     state.scannerModal = null;
-    state.scannerLoggedOut = true;
+    state.scanError = null;
+    state.page = 'phone';
+    state.phoneFromHistory = false;
     render();
   },
   fakeLogin(name) {
@@ -586,7 +621,7 @@ window.actions = {
   },
   blocked: handleBlockedAction,
   toggleConsole() {
-    state.consoleOpen = !state.consoleOpen;
+    state.consoleOpen = true;
     render();
   },
   toggle(key) {
@@ -596,6 +631,7 @@ window.actions = {
       state.phoneFromHistory = false;
     }
     if (key === 'channelEnabled' && !state.channelEnabled) state.scannerModal = null;
+    if (key === 'channelEnabled' && !state.channelEnabled) state.scanError = null;
     if (key === 'channelEnabled' && state.channelEnabled && state.page !== (state.hasHistory ? 'history' : 'phone')) {
       state.page = state.hasHistory ? 'history' : 'phone';
     }
@@ -613,11 +649,31 @@ window.actions = {
       phoneFromHistory: false,
       page: 'history',
       qrOriginPage: null,
-      consoleOpen: false,
+      consoleOpen: true,
       qr: null,
       scannerModal: null,
+      targetModal: null,
+      scanError: null,
       toast: '',
       logs: []
+    });
+    window.clearInterval(timer);
+    render();
+  },
+  resetFlow() {
+    Object.assign(state, {
+      qrLoginAccount: false,
+      scannerPermission: false,
+      scannerLoggedOut: false,
+      scanMode: 'camera',
+      phoneFromHistory: false,
+      page: state.hasHistory ? 'history' : 'phone',
+      qrOriginPage: null,
+      qr: null,
+      scannerModal: null,
+      targetModal: null,
+      scanError: null,
+      toast: ''
     });
     window.clearInterval(timer);
     render();
