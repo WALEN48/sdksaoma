@@ -1,7 +1,7 @@
 const SCENE = 'TZ_SDK_QR_LOGIN';
 const LOGIN_METHOD = 'qr_login';
 const EXPIRY_SECONDS = 120;
-const VERSION = 'v0.1.1';
+const VERSION = 'v0.1.2';
 const SUCCESS_PROMPT = '扫码登录校验成功,您的账号已在扫码设备上登录，当前账号已下线';
 
 const state = {
@@ -109,7 +109,7 @@ function handleCornerQr() {
 }
 
 function expireQr(showToast = true) {
-  if (!state.qr) state.qr = newQr('expired');
+  if (!state.qr || state.qr.status !== 'active') startQr();
   state.qr.status = 'expired';
   state.qr.expiresAt = Date.now();
   addLog('qr_expired', '二维码已过期');
@@ -169,6 +169,7 @@ function confirmAuth() {
 }
 
 function cancelAuth() {
+  if (!state.qr || state.qr.status !== 'active') startQr();
   if (state.qr) state.qr.status = 'canceled';
   state.scannerModal = null;
   state.scanError = null;
@@ -306,7 +307,7 @@ function renderQrLogin() {
         ${mask ? `<div class="qrMask"><b>${statusText}</b><span>${note}</span>${expired ? `<button onclick="actions.startQr()">${icon('refresh')}刷新</button>` : ''}</div>` : ''}
       </div>
       <p>使用“用户中心 - 扫一扫”授权登录<br />授权状态仅本次生效</p>
-      <small>${expired ? '二维码已过期' : `二维码有效剩余 <b id="countdown">${getRemainingSeconds()}</b> 秒`}</small>
+      ${expired ? '' : `<small>二维码有效剩余 <b id="countdown">${getRemainingSeconds()}</b> 秒</small>`}
     </div>
   `, '', 'sdkBranded qrOnly');
 }
