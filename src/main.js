@@ -1,11 +1,13 @@
 const SCENE = 'TZ_SDK_QR_LOGIN';
 const LOGIN_METHOD = '扫码登录';
 const EXPIRY_SECONDS = 120;
-const VERSION = 'v0.1.3';
+const VERSION = 'v0.1.4';
 const SUCCESS_PROMPT = '扫码登录校验成功，您的账号已在扫码设备上登录，当前账号已下线';
+const TARGET_SUCCESS_PROMPT = '扫码授权登录成功';
 const SCAN_EXPIRED_TEXT = '二维码已过期，请重新生成';
 const SCAN_INVALID_TEXT = '二维码已失效，请重新生成';
-const QR_ENTRY_BLOCKED = new Set(['phone', 'wechat', 'lock', 'logout']);
+const SCAN_MISMATCH_TEXT = '无效二维码';
+const QR_ENTRY_BLOCKED = new Set(['phone', 'wechat', 'lock', 'scan', 'logout']);
 
 const state = {
   hasHistory: true,
@@ -147,9 +149,9 @@ function simulateScan(mode = 'camera') {
   }
   if (!state.sameGameId) {
     state.scannerModal = 'scanFailed';
-    state.scanError = 'invalid';
+    state.scanError = 'mismatch';
     addLog('scan_failed', 'gameid_mismatch');
-    setToast(SCAN_INVALID_TEXT);
+    setToast(SCAN_MISMATCH_TEXT);
     render();
     return;
   }
@@ -319,7 +321,7 @@ function renderQrLogin() {
     <div class="qrPanel">
       <div class="qrBox">
         ${qrPattern(mask)}
-        ${mask ? `<div class="qrMask"><b>${statusText}</b><span>${note}</span>${expired || invalid ? `<button onclick="actions.startQr()">${icon('refresh')}刷新</button>` : ''}</div>` : ''}
+          ${mask ? `<div class="qrMask"><b>${statusText}</b><span>${note}</span>${expired || invalid || canceled ? `<button onclick="actions.startQr()">${icon('refresh')}刷新</button>` : ''}</div>` : ''}
       </div>
       <p>使用“用户中心 - 扫一扫”授权登录<br />授权状态仅本次生效</p>
       ${expired || invalid || canceled ? '' : `<small>二维码有效剩余 <b id="countdown">${getRemainingSeconds()}</b> 秒</small>`}
@@ -358,12 +360,12 @@ function renderTargetDevice() {
 function renderTargetModal() {
   if (state.targetModal !== 'success') return '';
   return `
-    <div class="modalLayer"><div class="dialog result">
-      <h3>提示</h3>
-      <p>${SUCCESS_PROMPT}</p>
-      <button class="primary wide" onclick="actions.closeTargetModal()">确定</button>
-    </div></div>
-  `;
+      <div class="modalLayer"><div class="dialog result">
+        <h3>提示</h3>
+      <p>${TARGET_SUCCESS_PROMPT}</p>
+        <button class="primary wide" onclick="actions.closeTargetModal()">确定</button>
+      </div></div>
+    `;
 }
 
 function renderUserCenter() {
@@ -377,12 +379,13 @@ function renderUserCenter() {
     ['用户协议', '', 'doc'],
     ['隐私政策', '', 'privacy']
   ];
-  return rows.map(([label, value, type]) => {
-    if (type === 'scan' && !state.channelEnabled) return '';
-    const blocked = state.qrLoginAccount && QR_ENTRY_BLOCKED.has(type);
-    const click = type === 'scan' ? 'actions.openScanner()' : blocked ? `actions.blocked('${label}', true)` : `actions.blocked('${label}')`;
+  return rows.filter(([_, __, type]) => {
+    if (type === 'scan' && (!state.channelEnabled || state.qrLoginAccount)) return false;
+    return !(state.qrLoginAccount && QR_ENTRY_BLOCKED.has(type));
+  }).map(([label, value, type]) => {
+    const click = type === 'scan' ? 'actions.openScanner()' : `actions.blocked('${label}')`;
     const arrow = ['shield', 'info', 'doc', 'logout'].includes(type);
-    return `<button class="centerRow ${type === 'scan' ? 'scanRow' : ''} ${blocked ? 'blocked' : ''}" onclick="${click}">
+    return `<button class="centerRow ${type === 'scan' ? 'scanRow' : ''}" onclick="${click}">
       <i class="centerIcon ${type}">${type === 'wechat' ? icon('wechat') : ''}</i>
       <span>${label}</span>
       <em>${value || (arrow ? icon('chevron') : '')}</em>
@@ -485,7 +488,7 @@ function renderScannerModal() {
     `;
   }
   if (state.scannerModal === 'scanFailed') {
-    const msg = state.scanError === 'invalid' ? SCAN_INVALID_TEXT : SCAN_EXPIRED_TEXT;
+    const msg = state.scanError === 'mismatch' ? SCAN_MISMATCH_TEXT : state.scanError === 'invalid' ? SCAN_INVALID_TEXT : SCAN_EXPIRED_TEXT;
     return `
       <div class="modalLayer"><div class="dialog result">
         <h3>提示</h3>
@@ -591,9 +594,9 @@ window.actions = {
     ensureQr(() => {
       if (!state.sameGameId) {
         state.scannerModal = 'scanFailed';
-        state.scanError = 'invalid';
+        state.scanError = 'mismatch';
         addLog('scan_failed', 'gameid_mismatch');
-        setToast(SCAN_INVALID_TEXT);
+        setToast(SCAN_MISMATCH_TEXT);
         render();
         return;
       }
